@@ -37,26 +37,60 @@ Specific objectives included:
 
 # Repository Structure
 
-## `/data`
+## Data
 
-Contains processed datasets used for machine learning analysis.
+The `data` folder contains the input files required to run the analysis in Google Colab. These files include forest inventory tables, polygon shapefiles, administrative boundary data, and selected satellite image exports used for visual inspection.
 
-### Files
+### Main data files
 
-* `inventory_data.csv` – cleaned and harmonised forest inventory dataset
-* `sentinel_features.csv` – Sentinel-1 and Sentinel-2 predictors extracted in Google Earth Engine
-* `merged_dataset.csv` – final dataset used for modelling
+- `all_properties_coded.dbf`  
+  Forest inventory attribute table used in the analysis. It contains coded stand-level inventory information.
 
+- `Latvia_NFI_S2_S1_Summer_2025_merged_coded.csv`  
+Sentinel-derived feature table containing predictor variables extracted for each forest stand polygon. The file includes stand identifiers and satellite-based features used for later merging with inventory data in Python.
+
+### Forest stand polygon files
+
+- `Nogapoly.shp`
+- `Nogapoly.dbf`
+- `Nogapoly.shx`
+- `Nogapoly.prj`
+- `Nogapoly.cpg`
+
+These files form the forest stand polygon shapefile. The polygon boundaries were used for spatial processing, satellite feature extraction from (GEE), and linking satellite-derived values to inventory records. 
+
+### Latvia boundary files
+
+- `gadm41_LVA_0.shp`
+- `gadm41_LVA_0.dbf`
+- `gadm41_LVA_0.shx`
+- `gadm41_LVA_0.prj`
+- `gadm41_LVA_0.cpg`
+- `gadm41_LVA_0.json`
+
+These files contain the administrative boundary of Latvia and were used for mapping and visualisation purposes.
+
+### Satellite image examples
+
+Files starting with:
+
+- `nice_satellite_image...`
+- `satellite_with_polygon...`
+
+These are exported satellite image examples used for visual inspection of selected forest stands.
+
+The `nice_satellite_image...` files show RGB satellite images of selected areas.
+
+The `satellite_with_polygon...` files show the same satellite images with forest stand polygon outlines added. These images were used to compare inventory records, model predictions, and satellite appearance for selected high-deviation stands.
+
+### Important note
+
+All shapefile components must be kept together in the same folder. For example, `Nogapoly.shp` will not work correctly without its related `.dbf`, `.shx`, `.prj`, and `.cpg` files.
 ---
 
-## `/gee_scripts`
+## `Google Earth Engine Java script`
 
 Google Earth Engine JavaScript scripts used for satellite data preprocessing and feature extraction.
-
-### Files
-
-* `sentinel_feature_extraction.js` – extraction of Sentinel-1 and Sentinel-2 predictors
-* `visualisation_export.js` – export of RGB satellite images and polygon overlays
 
 Main processing steps:
 
@@ -68,73 +102,19 @@ Main processing steps:
 
 ---
 
-## `/notebooks`
+## `Code.ipynb`
 
-Jupyter notebooks used for data analysis and modelling.
+Python (colab environment) notebooks used for data analysis and modelling.
 
-### Files
+## Analysis Code
 
-* `01_data_preprocessing.ipynb` – data cleaning and preprocessing
-* `02_feature_analysis.ipynb` – exploratory analysis and correlation filtering
-* `03_regression_models.ipynb` – GSV and height modelling
-* `04_classification_models.ipynb` – species and age-class classification
-* `05_residual_analysis.ipynb` – residual analysis and identification of high-deviation stands
+The analysis was carried out in Google Colab using Python. The code includes data preprocessing, feature selection, machine learning modelling, model evaluation, and residual analysis.
 
----
+If notebooks are added later, they can be placed in a separate `notebooks` folder.
 
-## `/models`
+## Models
 
-Saved machine learning models.
-
-### Files
-
-* `rf_gsv_model.joblib`
-* `rf_height_model.joblib`
-* `rf_species_model.joblib`
-* `rf_ageclass_model.joblib`
-* `gb_models/`
-
----
-
-## `/figures`
-
-Contains figures used in the thesis and presentation.
-
-### Includes
-
-* feature importance plots
-* scatter plots
-* confusion matrices
-* residual distributions
-* high-deviation stand examples
-* workflow diagrams
-
----
-
-## `/results`
-
-Model evaluation outputs and summary tables.
-
-### Includes
-
-* regression metrics
-* classification metrics
-* confusion matrices
-* residual statistics
-* high-deviation stand analysis
-
----
-
-## `/thesis`
-
-Master’s thesis document and presentation materials.
-
-### Files
-
-* `master_thesis.pdf`
-* `conference_presentation.pdf`
-* `appendices.pdf`
-
+Machine learning models were trained during the analysis workflow. Saved model files are not included in this repository.
 ---
 
 # Methodology Summary
@@ -188,18 +168,6 @@ Tasks included:
 
 ---
 
-# Main Findings
-
-* Moderate predictive performance was achieved for GSV and stand height estimation
-* Age-class classification performed better than dominant species classification
-* Optical Sentinel-2 predictors were generally more important than SAR variables
-* Smaller and older stands showed larger prediction residuals
-* High-deviation residuals helped identify potentially inconsistent inventory records
-
-The results demonstrate that machine learning and Sentinel data can support not only forest attribute estimation, but also forest inventory quality assessment.
-
----
-
 # Tools and Technologies
 
 * Python
@@ -215,7 +183,7 @@ The results demonstrate that machine learning and Sentinel data can support not 
 
 # Author
 
-Sanita Ma
+Sanita Šulca
 
 Master’s thesis developed at:
 
@@ -229,4 +197,4 @@ Professor Dr.sc.ing. Irina Jackiva (Yatskiv)
 
 # License
 
-This repository is provided for academic and research purposes.
+This repository is provided for academic and research purposes ONLY.
