@@ -1,0 +1,200 @@
+ * 0) INPUTS
+var forest = ee.FeatureCollection('projects/civil-decoder-460709-j4/assets/Nogapoly');
+
+// Time window (summer growing season)
+var startDate = '2025-06-01';
+var endDate   = '2025-08-31';
+
+// Batch export settings
+var batchSize  = 12000;    // if memory errors -> try 500 or 300
+var batchIndex = 47;       // 0,1,2,... change and re-run
+
+// ReduceRegions settings
+var scale = 10;           // 10m works well; if too heavy -> 20
+var tileScale = 16;       // if memory errors -> 32
+
+// Visual check
+Map.centerObject(forest, 7);
+Map.addLayer(
+  forest.style({color: 'FF0000', fillColor: '00000000', width: 1}),
+  {},
+  'Forest polygons'
+);
+
+ * 1) BUILD ONE BATCH OF POLYGONS
+var total = forest.size();
+var start = ee.Number(batchIndex).multiply(batchSize);
+var batch = ee.FeatureCollection(forest.toList(batchSize, start));
+
+print('Total polygons:', total);
+print('Batch index:', batchIndex, 'Batch size:', batchSize);
+print('This batch count:', batch.size());
+
+ * 2) SENTINEL-2 SR: mask clouds/shadows + scale reflectance
+
+function maskS2sr(img) {
+  var scl = img.select('SCL');
+
+  // mask out: cloud shadow(3), clouds(8,9,10), snow(11)
+  var mask = scl.neq(3)
+    .and(scl.neq(8))
+    .and(scl.neq(9))
+    .and(scl.neq(10))
+    .and(scl.neq(11));
+
+  // S2 SR is scaled by 10000 -> convert to reflectance 0..1
+  return img.updateMask(mask)
+            .multiply(0.0001)
+            .copyProperties(img, ['system:time_start']);
+}
+
+var s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+  .filterBounds(forest) // keep full area; reduces risk of missing edge polygons
+  .filterDate(startDate, endDate)
+  .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', 60))
+  .map(maskS2sr);
+
+print('S2 images in window:', s2.size());
+
+// Seasonal composite (robust to outliers)
+var s2Comp = s2.median();
+
+ * 3) SENTINEL-2 INDICES (NDVI, NDRE, NDMI, NBR)
+
+// NDVI = (B8 - B4) / (B8 + B4)
+var NDVI = s2Comp.normalizedDifference(['B8', 'B4']).rename('NDVI');
+
+// NDRE = (B8 - B5) / (B8 + B5)
+var NDRE = s2Comp.normalizedDifference(['B8', 'B5']).rename('NDRE');
+
+// NDMI = (B8 - B11) / (B8 + B11)  (moisture index)
+var NDMI = s2Comp.normalizedDifference(['B8', 'B11']).rename('NDMI');
+
+// NBR = (B8 - B12) / (B8 + B12)   (burn ratio, disturbance-related)
+var NBR  = s2Comp.normalizedDifference(['B8', 'B12']).rename('NBR');
+
+ * 4) SENTINEL-2 BANDS (10–20m)
+
+var s2Bands = s2Comp.select(
+  ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12'],
+  ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12']
+).float();
+
+
+ * 5) SENTINEL-1 GRD (VV, VH + simple derived features)
+
+var s1 = ee.ImageCollection('COPERNICUS/S1_GRD')
+  .filterBounds(forest)
+  .filterDate(startDate, endDate)
+  .filter(ee.Filter.eq('instrumentMode', 'IW'))
+  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))
+  .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING')) // keep consistent geometry
+  .select(['VV','VH']);
+
+print('S1 images in window:', s1.size());
+
+// Seasonal median composite (stable summary)
+var s1Comp = s1.median();
+
+// Core SAR predictors
+var S1_VV = s1Comp.select('VV').rename('S1_VV');
+var S1_VH = s1Comp.select('VH').rename('S1_VH');
+
+// Derived SAR predictors
+// NOTE: Since VV/VH are in dB, subtract is meaningful; ratio is optional but often used.
+var S1_VVminusVH = S1_VV.subtract(S1_VH).rename('S1_VVminusVH');
+var S1_VHdivVV   = S1_VH.divide(S1_VV).rename('S1_VHdivVV');
+
+
+ * 6) BUILD FINAL PREDICTOR STACK
+
+var predictors = ee.Image.cat([
+  s2Bands,
+  NDVI, NDRE, NDMI, NBR,
+  S1_VV, S1_VH, S1_VVminusVH, S1_VHdivVV
+]).float();
+
+
+ * 7) POLYGON-BASED EXTRACTION (MEAN)
+
+var stats = predictors.reduceRegions({
+  collection: batch,
+  reducer: ee.Reducer.mean(),
+  scale: scale,
+  tileScale: tileScale
+});
+
+// Remove geometry so CSV has NO ".geo"
+var stats_noGeom = stats.map(function(f) {
+  return ee.Feature(null, f.toDictionary());
+});
+
+
+ * 8) EXPORT (Drive -> CSV)
+
+// Export only the columns you want (keeps file clean)
+var selectors = [
+  // your IDs (adjust if needed)
+  'APAKSNOG','KADNUM','KVARTALS','NOGABALS',
+
+  // Sentinel-2 bands
+  'B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12',
+
+  // Indices
+  'NDVI','NDRE','NDMI','NBR',
+
+  // Sentinel-1
+  'S1_VV','S1_VH','S1_VVminusVH','S1_VHdivVV'
+];
+
+Export.table.toDrive({
+  collection: stats_noGeom.select(selectors),
+  description: 'Latvia_NFI_S2_S1_Summer_2025_batch_' + batchIndex,
+  fileNamePrefix: 'Latvia_NFI_S2_S1_Summer_2025_batch_' + batchIndex,
+  fileFormat: 'CSV'
+});
+// Select polygon
+var poly = forest
+  .filter(ee.Filter.eq('KADNUM', '60560010036'))
+  .filter(ee.Filter.eq('KVARTALS', 1))
+  .filter(ee.Filter.eq('NOGABALS', 1))
+  .filter(ee.Filter.eq('APAKSNOG', 0))
+  .first();
+
+// Export region (correct)
+var region = poly.geometry().bounds().buffer(50);
+
+// RGB visualization
+var rgbVis = {
+  bands: ['B4','B3','B2'],
+  min: 0.02,
+  max: 0.3,
+  gamma: 1.2
+};
+
+var rgbImage = s2Comp.visualize(rgbVis);
+
+// Export image
+Export.image.toDrive({
+  image: rgbImage,
+  description: 'nice_satellite_image60560010036',
+  region: region,
+  scale: 10,
+  maxPixels: 1e13
+});
+var outline = ee.Image().byte().paint({
+  featureCollection: ee.FeatureCollection([poly]),
+  color: 1,
+  width: 3
+});
+
+var outlined = rgbImage.blend(outline.visualize({palette:'red'}));
+
+Export.image.toDrive({
+  image: outlined,
+  description: 'satellite_with_polygon60560010036',
+  region: region,
+  scale: 10,
+  maxPixels: 1e13
+});
