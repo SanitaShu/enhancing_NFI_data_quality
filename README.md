@@ -21,17 +21,16 @@ The study area consists of forest stands located in Latvia.
 
 ---
 
-## Research Objectives
+## Objectives
 
-The main objective of this project was to develop an inventory-oriented approach for improving forest inventory data quality using supervised machine learning and Sentinel-1/2 data.
+The main objectives of this project were to:
 
-Specific objectives included:
-
-1. Analysing factors affecting the quality and consistency of inventory data
-2. Extracting spectral and SAR predictors from Sentinel imagery
-3. Developing supervised ML models for forest attribute estimation and classification
-4. Evaluating prediction errors and residual patterns
-5. Identifying high-deviation stands as potential indicators of inventory inconsistencies
+1. Review literature on forest inventory data quality, remote sensing, and machine learning in forestry.
+2. Prepare the research dataset by cleaning inventory data and extracting Sentinel-1 and Sentinel-2 predictors.
+3. Apply supervised machine learning models to estimate selected forest attributes.
+4. Evaluate model performance using regression and classification metrics.
+5. Analyse prediction errors and residual patterns to identify potential inconsistencies in inventory records.
+6. Summarise the results and assess the practical value of the approach for forest inventory data quality improvement.
 
 ---
 
