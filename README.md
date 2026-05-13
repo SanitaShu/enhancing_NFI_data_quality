@@ -176,7 +176,7 @@ Tasks included:
 * geopandas
 * rasterio
 * matplotlib
-* QGIS
+
 
 ---
 
